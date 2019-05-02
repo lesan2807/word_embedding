@@ -5,7 +5,10 @@
 
 #define MIN(a,b) (((a)<=(b))?(a):(b))
 
-#define MAX_WORD_LENGTH 50
+#define MAX_WORD_LENGTH 20
+
+// change this for your directory
+#define FILENAME "/home/lesan2807/Documents/MPIImplementation/word_embedding/word_embeddings_small.txt"
 
 
 int main(int argc, char *argv[])
@@ -29,7 +32,7 @@ int main(int argc, char *argv[])
 	}
 
 	int word_matrix_row_size = 10;  
-	int word_matrix_col_size = 5; 
+	int word_matrix_col_size = 300; 
 
 	// Get quotient and remainder to use a formula to calculate start and final 
 	int c = word_matrix_row_size / (process_count-1);
@@ -50,8 +53,8 @@ int main(int argc, char *argv[])
 		word_matrix[row_index] = (float*) calloc(word_matrix_col_size, sizeof(float));	
 
 
-	// Open file, change this for your working directory. 
-	FILE* word_embedding_file = fopen("/home/lesan2807/Documents/MPIImplementation/word_embedding/test.txt", "r");
+	// Open file,
+	FILE* word_embedding_file = fopen(FILENAME, "r");
 	if( !word_embedding_file)
 	{
 		printf("%s\n", "Could not open file. Ending program");
@@ -71,26 +74,33 @@ int main(int argc, char *argv[])
 				if(col_index == 0)
 				{
 					fscanf(word_embedding_file, "%s", words[distribute_index]); 
-					printf("%s\t", words[distribute_index]);
+					//printf("%s\t", words[distribute_index]);
 				}
 				fscanf(word_embedding_file, "%f", &word_matrix[distribute_index][col_index]); 
 				//printf("%0.16f\t", word_matrix[distribute_index][col_index]);
 			}
 			if(distribute_index == range-1)
 			{
-				MPI_Send(&words[0][0], (range + 1) * MAX_WORD_LENGTH, MPI_UNSIGNED_CHAR, num_process_destination, 0, MPI_COMM_WORLD);
-				//MPI_Send(word_matrix, word_matrix_row_size * word_matrix_col_size, MPI_FLOAT, num_process_destination, 0, MPI_COMM_WORLD); 
+				MPI_Send(&words[0][0], (range + 2) * MAX_WORD_LENGTH, MPI_UNSIGNED_CHAR, num_process_destination, 0, MPI_COMM_WORLD);
+				MPI_Send(&word_matrix[0][0], (range +16) * word_matrix_col_size, MPI_FLOAT, num_process_destination, 0, MPI_COMM_WORLD); 
 				++num_process_destination;  
 			}
 		}
 	}
 	else
 	{
-		MPI_Recv(&words[0][0], (range + 1) * MAX_WORD_LENGTH, MPI_UNSIGNED_CHAR, 0, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+		MPI_Recv(&words[0][0], (range + 2) * MAX_WORD_LENGTH, MPI_UNSIGNED_CHAR, 0, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+		MPI_Recv(&word_matrix[0][0], (range +16) * word_matrix_col_size, MPI_FLOAT, 0, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE); 
 
 		printf("%s%d\n", "I am process #", my_rank);
 		for(int index = 0; index < range; ++index)
-			printf("%s\n", words[index]);
+		{
+			for(int jndex = 0; jndex < word_matrix_col_size; ++jndex)
+			{
+				printf("[%f]", word_matrix[index][jndex]);
+			}
+			printf("%s%d\n", "from process#", my_rank);
+		}
 	}
 
 

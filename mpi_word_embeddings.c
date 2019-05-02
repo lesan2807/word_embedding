@@ -81,7 +81,7 @@ int main(int argc, char *argv[])
 			}
 			if(distribute_index == range-1)
 			{
-				MPI_Send(&words[0][0], (range + 2) * MAX_WORD_LENGTH, MPI_UNSIGNED_CHAR, num_process_destination, 0, MPI_COMM_WORLD);
+				MPI_Send(&words[0][0], (range + 2) * MAX_WORD_LENGTH, MPI_UNSIGNED_CHAR, num_process_destination, 0, MPI_COMM_WORLD); // TODO range only works for 2 processes
 				MPI_Send(&word_matrix[0][0], (range +16) * word_matrix_col_size, MPI_FLOAT, num_process_destination, 0, MPI_COMM_WORLD); 
 				++num_process_destination;  
 			}

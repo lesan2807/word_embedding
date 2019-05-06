@@ -59,15 +59,6 @@ void distribute_word_matrix(FILE* word_embedding_file, int my_rank, int process_
 	}
 }
 
-void send_exit(int my_rank, int process_count)
-{
-	for(int process_num = 1; process_num < process_count; ++process_num)
-	{
-		printf("%d %s %d\n", my_rank, "Sending command", COMMAND_EXIT);
-		MPI_Send(&COMMAND_EXIT, 1, MPI_INT, process_num, 2, MPI_COMM_WORLD); 
-	}
-}
-
 
 void run_master_node(FILE* word_embedding_file, int my_rank, int process_count, int c, int r)
 {
@@ -79,14 +70,18 @@ void run_master_node(FILE* word_embedding_file, int my_rank, int process_count, 
         scanf( "%s" , queryWord);
         if( strcmp(queryWord, "EXIT") == 0 )
         {
-        	send_exit(my_rank, process_count); 
+        	for(int process_num = 1; process_num < process_count; ++process_num)
+			{
+				printf("%d %s %d\n", my_rank, "Sending command", COMMAND_EXIT);
+				MPI_Send(&COMMAND_EXIT, 1, MPI_INT, process_num, 2, MPI_COMM_WORLD); 
+			}
         	break; 
         }
         else
         {
         	for(int process_num = 1; process_num < process_count; ++process_num)
         	{
-        		printf("%d %s %d\n", my_rank, "Sending command", COMMAND_QUERY);
+        		printf("%d %s %d %s\n", my_rank, "Sending command and query", COMMAND_QUERY, queryWord);
         		MPI_Send(&COMMAND_QUERY, 1, MPI_INT, process_num, 3, MPI_COMM_WORLD);
         		MPI_Send(queryWord, 1024, MPI_CHAR, process_num, 4, MPI_COMM_WORLD); 
         	}
@@ -94,13 +89,24 @@ void run_master_node(FILE* word_embedding_file, int my_rank, int process_count, 
         	int word_index = -1; 
         	for(int process_num = 1; process_num < process_count; ++process_num)
         	{
-        		MPI_Recv(&word_index, 1, MPI_INT, process_num, , MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+        		MPI_Recv(&word_index, 1, MPI_INT, process_num, 5, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
         		if(word_index >= 0)
         			target_process_id = process_num;
         	}
         }
 	}
 	free(queryWord);
+}
+
+int find_word_index(char* words, char* queryWord, int range)
+{
+	for(int index = 0; index < range; ++index)
+	{
+		printf("%s\n", &words[index*MAX_WORD_LENGTH]);
+		if( strcmp(&words[index*MAX_WORD_LENGTH] , queryWord) == 0)
+			return index; 
+	}
+	return -1;
 }
 
 void run_slave_node(int my_rank, int c, int r)
@@ -121,22 +127,33 @@ void run_slave_node(int my_rank, int c, int r)
     printf("%d: %s\n", my_rank, "Receiving matrix...");
     MPI_Recv(word_matrix, range * WORD_MATRIX_COL_SIZE, MPI_DOUBLE, 0, 1, MPI_COMM_WORLD, MPI_STATUS_IGNORE); 
 	
+    char* queryWord = calloc(1024, sizeof(char));
+    int word_index = -1; 
+
 	while(0 == 0)
 	{
 		int command = -1; 
 		MPI_Recv(&command, 1, MPI_INT, 0, 2, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+		MPI_Recv(&command, 1, MPI_INT, 0, 3, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
 		printf("%d: %s %d\n", my_rank, "Receiving command", command);
 		if(command == 0)
 			break;
-		else
+		else if(command == 1)
 		{
-
+			MPI_Recv(queryWord, 1024, MPI_CHAR, 0, 4, MPI_COMM_WORLD, MPI_STATUS_IGNORE);	
+			word_index = find_word_index(words, queryWord, range); 
+			if(word_index >= 0)
+			{
+				MPI_Send(&word_index, 1, MPI_INT, 0, 5, MPI_COMM_WORLD);
+				break;
+			}
 		}
 	}
 
 
     free(words); 
     free(word_matrix);
+    free(queryWord);
 }
 
 int main(int argc, char *argv[])

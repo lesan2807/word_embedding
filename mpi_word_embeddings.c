@@ -12,7 +12,7 @@
 #define VERSION_TOP_P
 
 #define MAX_WORD_LENGTH 20
-#define WORD_MATRIX_ROW_SIZE 10
+#define WORD_MATRIX_ROW_SIZE 1000
 #define WORD_MATRIX_COL_SIZE 300
 
 // Message tags.
@@ -72,9 +72,9 @@ void distribute_word_matrix(FILE* word_embedding_file, int my_rank, int process_
         printf (" %lf ", matrix_to_send [i]);
     }
     printf ("\n\n\n"); */
-    printf ("%d: Sending words to process %d...\n", my_rank, num_process_destination);
+    //printf ("%d: Sending words to process %d...\n", my_rank, num_process_destination);
     MPI_Send (words_to_send, sub_process_range * MAX_WORD_LENGTH, MPI_UNSIGNED_CHAR, num_process_destination, TAG_SEND_WORDS, MPI_COMM_WORLD);
-    printf ("%d: Sending matrix to process %d...\n", my_rank, num_process_destination);
+    //printf ("%d: Sending matrix to process %d...\n", my_rank, num_process_destination);
     MPI_Send (matrix_to_send, sub_process_range * WORD_MATRIX_COL_SIZE, MPI_DOUBLE, num_process_destination, TAG_SEND_MATRIX, MPI_COMM_WORLD);
       free (words_to_send);
       free (matrix_to_send);
@@ -106,9 +106,9 @@ void run_master_node (FILE* word_embedding_file, int my_rank, int process_count,
             {
                 //printf ("%d: %s %d %s\n", my_rank, "Sending command and query", COMMAND_QUERY, query_word);
                 MPI_Send (&COMMAND_QUERY, 1, MPI_INT, process_num, TAG_SEND_COMMAND, MPI_COMM_WORLD);
-                MPI_Send (query_word, strlen (query_word) + 1 /* include \0 */, MPI_CHAR, process_num, TAG_SEND_QUERY, MPI_COMM_WORLD); 
+                MPI_Send (query_word, strlen (query_word) + 2 /* include \0 */, MPI_CHAR, process_num, TAG_SEND_QUERY, MPI_COMM_WORLD); 
             }
-            printf ("%d: Receiving word indexes...\n", my_rank);
+            //printf ("%d: Receiving word indexes...\n", my_rank);
             int found = 0; // boolean.
             double word_embeddings [WORD_MATRIX_COL_SIZE];
 
@@ -118,9 +118,9 @@ void run_master_node (FILE* word_embedding_file, int my_rank, int process_count,
                 MPI_Recv (&received_index, 1, MPI_INT, process_num, TAG_SEND_WORD_INDEX, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
                 // printf ("%d: Received index %d from process %d\n", my_rank, received_index, process_num);
                 if (received_index != -1) {
-                    // printf ("%d: Found word on process %d\n", my_rank, process_num);
+                    //printf ("%d: Found word on process %d\n", my_rank, process_num);
                     MPI_Recv (word_embeddings, WORD_MATRIX_COL_SIZE, MPI_DOUBLE, process_num, TAG_SEND_WORD_EMBEDDINGS, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
-                    // printf ("%d: Received word embeddings, first val is %lf\n", my_rank, word_embeddings [0]);
+                    //printf ("%d: Received word embeddings, first val is %lf\n", my_rank, word_embeddings [0]);
                     found = 1;
                     // break; // Don't want unread messages.
                 }
@@ -136,7 +136,7 @@ void run_master_node (FILE* word_embedding_file, int my_rank, int process_count,
                     }
                     printf ("\n");
                     */
-                    // printf ("%d: Sending word embeddings to process %d\n", my_rank, process_num);
+                    //printf ("%d: Sending word embeddings to process %d\n", my_rank, process_num);
                     MPI_Send (word_embeddings, WORD_MATRIX_COL_SIZE, MPI_DOUBLE, process_num, TAG_SEND_WORD_EMBEDDINGS, MPI_COMM_WORLD);
                 }
                 // Allow them to process in parallel instead of waiting for each
@@ -149,11 +149,11 @@ void run_master_node (FILE* word_embedding_file, int my_rank, int process_count,
                 for (int process_num = 1; process_num < process_count; ++ process_num) {
                     char most_similar [MAX_WORD_LENGTH] = {0};
                     double score = -1;
-                    // printf ("%d: Receiving result from process %d\n", my_rank, process_num);
+                    //printf ("%d: Receiving result from process %d\n", my_rank, process_num);
                     MPI_Recv (most_similar, sizeof (most_similar), MPI_CHAR, process_num, TAG_SEND_WORD, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
-                    // printf ("%d: Receiving score from process %d\n", my_rank, process_num);
+                    //printf ("%d: Receiving score from process %d\n", my_rank, process_num);
                     MPI_Recv (&score, 1, MPI_DOUBLE, process_num, TAG_SEND_SCORE, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
-                    printf ("%d: Received word %s with score %lf\n", my_rank, most_similar, score);
+                    printf ("%d: (Top from each process) Received word %s with score %lf from process %d\n", my_rank, most_similar, score, process_num);
                     #ifdef VERSION_TOP_P
                     top_scores [process_num - 1] = score;
                     strcpy (top_values [process_num - 1], most_similar);
@@ -173,16 +173,19 @@ void run_master_node (FILE* word_embedding_file, int my_rank, int process_count,
 
                     double * score  = &top_scores [process_with_max - 1];
                     char * most_similar = top_values [process_with_max - 1];
-                    printf ("Word %s with score %lf\n", top_values [process_with_max - 1], max_score);
+                    printf ("(Top from all) Word %s with score %lf\n", top_values [process_with_max - 1], max_score);
+                    for (int i = 0; i < MAX_WORD_LENGTH; ++i) {
+                      most_similar [i] = 0;
+                    }
 
                     MPI_Send (&COMMAND_CALCULATE_SIMILARITY, 1, MPI_INT, process_with_max, TAG_SEND_COMMAND, MPI_COMM_WORLD);
                     MPI_Send (word_embeddings, WORD_MATRIX_COL_SIZE, MPI_DOUBLE, process_with_max, TAG_SEND_WORD_EMBEDDINGS, MPI_COMM_WORLD);
                     //printf ("%d: Sent request\n", my_rank);
-                    MPI_Recv (most_similar, sizeof (most_similar), MPI_CHAR, process_with_max, TAG_SEND_WORD, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+                    MPI_Recv (most_similar, MAX_WORD_LENGTH, MPI_CHAR, process_with_max, TAG_SEND_WORD, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
                     //strcpy (top_values [process_with_max], mos)
                     //printf ("%d: Received most similar\n", my_rank);
                     MPI_Recv (score, 1, MPI_DOUBLE, process_with_max, TAG_SEND_SCORE, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
-                    printf ("%d: Received word from process %d\n", my_rank, process_with_max);
+                    //printf ("%d: Received word from process %d\n", my_rank, process_with_max);
                 }
                 #endif
             } else {
@@ -196,7 +199,7 @@ int find_word_index (int my_rank, char* words, char* query_word, int range)
 {
     for (int index = 0; index < range; ++ index)
     {
-        printf ("%d: %s\n", my_rank, &words[index*MAX_WORD_LENGTH]);
+        //printf ("%d: %s\n", my_rank, &words[index*MAX_WORD_LENGTH]);
         if (strcmp (&words[index*MAX_WORD_LENGTH], query_word) == 0)
             return index; 
     }

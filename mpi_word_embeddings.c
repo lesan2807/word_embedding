@@ -1,5 +1,3 @@
-// NOTE: P is assumed to be process_count - 1.
-
 #include <mpi.h>
 #include <stdio.h>
 #include <stdlib.h> 
@@ -33,12 +31,12 @@ const int COMMAND_CALCULATE_SIMILARITY = 2;
 #define FILENAME "word_embeddings_small.txt"
 
 /*
-  /// This method divides the matrix and words vector equally between processes. 
+  /// This function distributes the matrix and words vector equally between processes. 
   /// For each slave process we create a words_to_send and matrix_to_send vectors. 
-  /// Instead of reading the matrix and then dividing, we calculate the range that will be allocated for each process. 
+  /// Instead of reading the matrix and then dividing, we calculate the range that will be allocated for each process.
 
-  @param word_embedding_file File that was opened in main 
-  @param my_rank this is actual rank for this case it will be 0. 
+  @param word_embedding_file File with each word and it's vector. 
+  @param my_rank this node's rank. 
   @param process_count is the total amout of processes in MPI_COMM_WORLD
   @param c is the quotient in order to apply the formula to divide equally 
   @param r is the remainder in order to apply the formula to divide equally
@@ -82,6 +80,15 @@ void distribute_word_matrix(FILE* word_embedding_file, int my_rank, int process_
 }
 
 
+/*
+/// Executes the command and control logic that corresponds to the 0th node.
+
+@param word_embedding_file File with each word and it's vector. 
+@param my_rank this node's rank, for this case it will be 0.
+@param process_count is the total amout of processes in MPI_COMM_WORLD
+@param c is the quotient in order to apply the formula to divide equally 
+@param r is the remainder in order to apply the formula to divide equally
+*/
 void run_master_node (FILE* word_embedding_file, int my_rank, int process_count, int c, int r)
 {
     distribute_word_matrix (word_embedding_file, my_rank, process_count, c, r);
@@ -89,7 +96,7 @@ void run_master_node (FILE* word_embedding_file, int my_rank, int process_count,
     {
         printf ("Please type a query word:\n");
 
-        char query_word [1024];
+        char query_word [MAX_WORD_LENGTH];
         scanf ("%1023s" , query_word);
         if (strcmp(query_word, "EXIT") == 0)
         {
@@ -106,7 +113,7 @@ void run_master_node (FILE* word_embedding_file, int my_rank, int process_count,
             {
                 //printf ("%d: %s %d %s\n", my_rank, "Sending command and query", COMMAND_QUERY, query_word);
                 MPI_Send (&COMMAND_QUERY, 1, MPI_INT, process_num, TAG_SEND_COMMAND, MPI_COMM_WORLD);
-                MPI_Send (query_word, strlen (query_word) + 2 /* include \0 */, MPI_CHAR, process_num, TAG_SEND_QUERY, MPI_COMM_WORLD); 
+                MPI_Send (query_word, strlen (query_word) + 1 /* include \0 */, MPI_CHAR, process_num, TAG_SEND_QUERY, MPI_COMM_WORLD); 
             }
             //printf ("%d: Receiving word indexes...\n", my_rank);
             int found = 0; // boolean.
@@ -195,6 +202,15 @@ void run_master_node (FILE* word_embedding_file, int my_rank, int process_count,
     }
 }
 
+/*
+/// Checks whether query_word is present on words.
+/// If it is, then returns the index on words, -1 otherwise.
+
+@param my_rank this node's rank (node id).
+@param words is the vector with the words to try matching with query_word.
+@param query_word is the word for which we want the index.
+@param range is this node's amount of rows.
+*/
 int find_word_index (int my_rank, char* words, char* query_word, int range)
 {
     for (int index = 0; index < range; ++ index)
@@ -206,6 +222,13 @@ int find_word_index (int my_rank, char* words, char* query_word, int range)
     return -1;
 }
 
+/*
+/// Executes the worker logic for all processes except the first one.
+
+@param my_rank this node's rank (node id).
+@param c is the quotient in order to apply the formula to divide equally 
+@param r is the remainder in order to apply the formula to divide equally
+*/
 void run_slave_node (int my_rank, int c, int r)
 {
     // Get quotient and remainder to use a formula to calculate start and final 
@@ -301,7 +324,11 @@ void run_slave_node (int my_rank, int c, int r)
     free (word_matrix);
 }
 
-int main(int argc, char *argv[])
+/*
+/// Executes for both master and slave nodes.
+/// Implements the requirements of the project.
+*/
+int main (int argc, char *argv[])
 {
   MPI_Init(&argc, &argv);
 

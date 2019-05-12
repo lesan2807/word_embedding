@@ -2,7 +2,7 @@
 #include <stdio.h>
 #include <stdlib.h> 
 #include <string.h>
-#include "omp.h"
+//#include "omp.h"
 
 
 #define MIN(a,b) (((a)<=(b))?(a):(b))
@@ -28,7 +28,7 @@ const int COMMAND_EXIT = 0;
 const int COMMAND_QUERY = 1;
 const int COMMAND_CALCULATE_SIMILARITY = 2;
 
-#define FILENAME "word_embeddings_small.txt"
+#define FILENAME "word_embeddings_1000.txt"
 
 /*
   /// This function distributes the matrix and words vector equally between processes. 
@@ -100,7 +100,7 @@ void run_master_node (FILE* word_embedding_file, int my_rank, int process_count,
         scanf ("%1023s" , query_word);
         if (strcmp(query_word, "EXIT") == 0)
         {
-            #pragma omp for
+            //#pragma omp for
             for (int process_num = 1; process_num < process_count; ++ process_num)
             {
                 //printf ("%d %s %d\n", my_rank, "Sending command", COMMAND_EXIT);
@@ -108,7 +108,7 @@ void run_master_node (FILE* word_embedding_file, int my_rank, int process_count,
             }
             break; 
         } else { // Got a word to query instead of EXIT.
-            #pragma omp for
+            //#pragma omp for
             for (int process_num = 1; process_num < process_count; ++ process_num)
             {
                 //printf ("%d: %s %d %s\n", my_rank, "Sending command and query", COMMAND_QUERY, query_word);
@@ -119,7 +119,7 @@ void run_master_node (FILE* word_embedding_file, int my_rank, int process_count,
             int found = 0; // boolean.
             double word_embeddings [WORD_MATRIX_COL_SIZE];
 
-            #pragma omp for
+            //#pragma omp for
             for (int process_num = 1; process_num < process_count; ++ process_num) {
                 int received_index = -2;
                 MPI_Recv (&received_index, 1, MPI_INT, process_num, TAG_SEND_WORD_INDEX, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
@@ -133,7 +133,7 @@ void run_master_node (FILE* word_embedding_file, int my_rank, int process_count,
                 }
             }
             if (found) {
-                #pragma omp for
+                //#pragma omp for
                 for (int process_num = 1; process_num < process_count; ++ process_num) {
                     // printf ("%d: Sending command to calculate similarity to process %d\n", my_rank, process_num);
                     MPI_Send (&COMMAND_CALCULATE_SIMILARITY, 1, MPI_INT, process_num, TAG_SEND_COMMAND, MPI_COMM_WORLD);
@@ -152,7 +152,7 @@ void run_master_node (FILE* word_embedding_file, int my_rank, int process_count,
                 double top_scores [process_count - 1];
                 char top_values   [process_count - 1][MAX_WORD_LENGTH];
                 #endif
-                #pragma omp for
+                //#pragma omp for
                 for (int process_num = 1; process_num < process_count; ++ process_num) {
                     char most_similar [MAX_WORD_LENGTH] = {0};
                     double score = -1;
